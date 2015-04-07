@@ -1,34 +1,10 @@
 'use strict';
-
 /**
- * A directive for adding google places autocomplete to a text box
- * google places autocomplete info: https://developers.google.com/maps/documentation/javascript/places
- *
- * Usage:
- *
- * <input type="text"  ng-autocomplete ng-model="autocomplete" options="options" details="details/>
- *
- * + ng-model - autocomplete textbox value
- *
- * + details - more detailed autocomplete result, includes address parts, latlng, etc. (Optional)
- *
- * + options - configuration for the autocomplete (Optional)
- *
- *       + types: type,        String, values can be 'geocode', 'establishment', '(regions)', or '(cities)'
- *       + bounds: bounds,     Google maps LatLngBounds Object, biases results to bounds, but may return results outside these bounds
- *       + country: country    String, ISO 3166-1 Alpha-2 compatible country code. examples; 'ca', 'us', 'gb'
- *       + watchEnter:         Boolean, true; on Enter select top autocomplete result. false(default); enter ends autocomplete
- *
- * example:
- *
- *    options = {
- *        types: '(cities)',
- *        country: 'ca'
- *    }
-**/
-
-angular.module( "ngAutocomplete", [])
-  .directive('ngAutocomplete', function() {
+ * autocompleteDirective able to be loaded asynchronously, just send a 'google-maps-ready' angular broadCast when google maps is loaded with "places" module
+ * tested with Angular-ui/angular-google-maps   using "uiGmapGoogleMapApi" to send broadCast
+ */
+angular.module("ngMapsAutocomplete")
+  .directive('ngMapsAutocomplete', function() {
     return {
       require: 'ngModel',
       scope: {
@@ -38,14 +14,13 @@ angular.module( "ngAutocomplete", [])
       },
 
       link: function(scope, element, attrs, controller) {
-
         //options for autocomplete
-        var opts
-        var watchEnter = false
+        var opts;
+        var watchEnter = false;
         //convert options provided to opts
         var initOpts = function() {
 
-          opts = {}
+          opts = {};
           if (scope.options) {
 
             if (scope.options.watchEnter !== true) {
@@ -55,15 +30,15 @@ angular.module( "ngAutocomplete", [])
             }
 
             if (scope.options.types) {
-              opts.types = []
-              opts.types.push(scope.options.types)
+              opts.types = [];
+              opts.types.push(scope.options.types);
               scope.gPlace.setTypes(opts.types)
             } else {
               scope.gPlace.setTypes([])
             }
 
             if (scope.options.bounds) {
-              opts.bounds = scope.options.bounds
+              opts.bounds = scope.options.bounds;
               scope.gPlace.setBounds(opts.bounds)
             } else {
               scope.gPlace.setBounds(null)
@@ -72,38 +47,41 @@ angular.module( "ngAutocomplete", [])
             if (scope.options.country) {
               opts.componentRestrictions = {
                 country: scope.options.country
-              }
+              };
               scope.gPlace.setComponentRestrictions(opts.componentRestrictions)
             } else {
               scope.gPlace.setComponentRestrictions(null)
             }
           }
-        }
+        };
 
-        if (scope.gPlace == undefined) {
-          scope.gPlace = new google.maps.places.Autocomplete(element[0], {});
-        }
-        google.maps.event.addListener(scope.gPlace, 'place_changed', function() {
-          var result = scope.gPlace.getPlace();
-          if (result !== undefined) {
-            if (result.address_components !== undefined) {
+        var init = function(){
+          if (scope.gPlace == undefined) {
+            scope.gPlace = new google.maps.places.Autocomplete(element[0], {});
+          }
+          google.maps.event.addListener(scope.gPlace, 'place_changed', function() {
+            var result = scope.gPlace.getPlace();
+            if (result !== undefined) {
+              if (result.address_components !== undefined) {
 
-              scope.$apply(function() {
+                scope.$apply(function() {
 
-                scope.details = result;
+                  scope.details = result;
 
-                controller.$setViewValue(element.val());
-              });
-            }
-            else {
-              if (watchEnter) {
-                getPlace(result)
+                  controller.$setViewValue(element.val());
+                });
+              }
+              else {
+                if (watchEnter) {
+                  getPlace(result)
+                }
               }
             }
-          }
-        })
+          })
+        };
 
-        //function to get retrieve the autocompletes first result using the AutocompleteService 
+
+        //function to get retrieve the autocompletes first result using the AutocompleteService
         var getPlace = function(result) {
           var autocompleteService = new google.maps.places.AutocompleteService();
           if (result.name.length > 0){
@@ -146,19 +124,30 @@ angular.module( "ngAutocomplete", [])
                 }
               });
           }
-        }
+        };
 
         controller.$render = function () {
           var location = controller.$viewValue;
           element.val(location);
         };
 
+
+        //listening when maps is loaded
+        var mapLoaded=false;
+        scope.$on('google-maps-ready', function(event,args) {
+            mapLoaded=true;
+            init();
+            initOpts();
+        });
+
         //watch options provided to directive
         scope.watchOptions = function () {
           return scope.options
         };
         scope.$watch(scope.watchOptions, function () {
-          initOpts()
+          if(mapLoaded){
+            initOpts()
+          }
         }, true);
 
       }
